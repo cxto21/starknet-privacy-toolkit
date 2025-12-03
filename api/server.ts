@@ -1,5 +1,6 @@
 import { $ } from "bun";
-import { writeFileSync } from "fs";
+import { writeFileSync, existsSync } from "fs";
+import path from "path";
 import { buildPoseidon } from "circomlibjs";
 
 let poseidon: any = null;
@@ -42,9 +43,12 @@ threshold = ${threshold}
 badge_tier = ${badgetier}
 donation_commitment = "${commitment}"
 `;
-        writeFileSync("/workspaces/tongo-ukraine-donations/zk-badges/donation_badge/Prover.toml", proverToml);
+        const repoRoot = process.cwd();
+        const dir = path.join(repoRoot, "zk-badges", "donation_badge");
+        const garagaEnvBin = path.join(repoRoot, "garaga-env", "bin", "garaga");
+        const garagaBin = existsSync(garagaEnvBin) ? garagaEnvBin : "garaga";
 
-        const dir = "/workspaces/tongo-ukraine-donations/zk-badges/donation_badge";
+        writeFileSync(path.join(dir, "Prover.toml"), proverToml);
         console.log("Running nargo execute...");
         await $`cd ${dir} && nargo execute witness`.quiet();
         console.log("Running bb prove...");
@@ -52,7 +56,7 @@ donation_commitment = "${commitment}"
         console.log("Running bb write_vk...");
         await $`cd ${dir} && bb write_vk_ultra_keccak_honk -b ./target/donation_badge.json -o ./target/vk`.quiet();
         console.log("Running garaga calldata...");
-        const result = await $`cd ${dir} && /workspaces/tongo-ukraine-donations/garaga-env/bin/garaga calldata --system ultra_keccak_honk --vk ./target/vk --proof ./target/proof --format array`.text();
+        const result = await $`cd ${dir} && ${garagaBin} calldata --system ultra_keccak_honk --vk ./target/vk --proof ./target/proof --format array`.text();
 
         console.log("Proof generated successfully!");
         return new Response(JSON.stringify({ calldata: result.trim(), commitment, success: true }), { headers });

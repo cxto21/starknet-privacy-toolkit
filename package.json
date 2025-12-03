@@ -15,6 +15,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "deploy": "bun run build:deploy && npx wrangler pages deploy dist --project-name=tongo-ukraine",
+    "api": "bun run api/server.ts",
     "deploy:login": "npx wrangler login",
     "deploy:build": "bun run build:deploy"
   },
