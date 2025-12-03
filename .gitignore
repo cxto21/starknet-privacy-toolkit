@@ -39,8 +39,7 @@ zk-badges/**/target/
 zk-badges/**/*.bin
 zk-badges/**/Prover.toml
 
-# Garaga generated files
-donation_badge_verifier/src/lib.cairo
+# Garaga/Cairo generated files
 donation_badge_verifier/target/
 *.sierra
 *.casm
@@ -50,6 +49,9 @@ zk-badges/calldata.json
 zk-badges/calldata.txt
 zk-badges/calldata_hex.txt
 tongo-donation-context-*.txt
+
+# Root-level generated calldata
+calldata.txt
 
 # Vendor dependencies (if using submodules or vendoring)
 vendor/
