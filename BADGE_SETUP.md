@@ -1,97 +1,113 @@
 # 🏅 Verified Donor Badge System Setup Guide
 
-This guide walks you through setting up the complete Verified Donor Badge system using Noir + Garaga + Starknet.
+This guide explains how to set up the Verified Donor Badge system.
 
-## Prerequisites
+## Tech Stack
 
-- Node.js 18+ and Bun
-- Python 3.10+ (for Garaga)
-- Rust (for Noir/Barretenberg)
+- **Noir** `1.0.0-beta.1` + Poseidon dependency
+- **Barretenberg** `0.67.0` (Ultra Keccak Honk backend)
+- **Garaga** `0.15.5` for Cairo verifier generation
+- **Scarb** `2.9.2` (Cairo build)
+- **Starknet Foundry** (`sncast`, `snforge`) for declares/deploys
+- **Starkli** for manual invocations
+- **Bun + TypeScript** for frontend/API
 
-## Step 1: Install Noir (nargo)
+> **Note**: The automated installation will handle most of these prerequisites.
 
-```bash
-# Install noirup
-curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+---
 
-# Reload shell
-source ~/.bashrc  # or ~/.zshrc
+## Step 1: Install Required Tools
 
-# Install latest stable Noir
-noirup --version 1.0.0-beta.5
+### Option A: Automated Installation
 
-# Verify installation
-nargo --version
-# Expected: nargo version = 1.0.0-beta.5
-```
-
-## Step 2: Install Barretenberg (bb)
+1. Run the `setup.sh` script to install all required tools and dependencies:
 
 ```bash
-# Install bbup (auto-detects compatible version with your Noir)
-curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash
-
-# Reload shell
-source ~/.bashrc
-
-# Install bb (auto-matches Noir version)
-bbup
-
-# Verify installation
-bb --version
-# Expected: v0.82.2 or compatible
+./scripts/setup.sh
 ```
 
-## Step 3: Install Garaga (Python 3.10 required)
+This script will:
+- Install system dependencies (e.g., `libc++1`, `build-essential`, `python3.10-dev`)
+- Install Rust and Cargo
+- Install Scarb
+- Install Noir CLI
+- Install Barretenberg (bb)
+- Install Garaga (Python CLI)
+
+2. **Verify the installation**
+   ```bash
+   make install-all
+   ```
+
+### Option B: Manual Installation
+
+Follow these steps to install each tool manually:
+
+#### 1. Install System Dependencies
 
 ```bash
-# Create Python 3.10 virtual environment
-python3.10 -m venv garaga-env
-source garaga-env/bin/activate
-
-# Install Garaga
-pip install garaga==0.15.5
-
-# Verify installation
-garaga --help
+sudo apt-get update
+sudo apt-get install -y libc++1 build-essential python3.10-dev
+python3.10 -m pip install --upgrade pip setuptools wheel
 ```
 
-## Step 4: Install Starknet Foundry (for contract deployment)
+#### 2. Install Rust and Cargo
 
 ```bash
-# Install snfoundryup
-curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
-
-# Reload shell
-source ~/.bashrc
-
-# Install starknet foundry
-snfoundryup
-
-# Verify
-snforge --version
-sncast --version
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | RUSTUP_INIT_SKIP_PATH_CHECK=yes sh -s -- -y
+source $HOME/.cargo/env
 ```
 
-## Step 5: Compile the Noir Circuit
+Note: Rust/Cargo are required only because tooling like `noirup`/`bbup` ship prebuilt binaries and occasionally build helpers that rely on Rust's environment. We do not compile Rust code in this project.
+
+#### 3. Install Scarb
+
+```bash
+./scripts/install-scarb.sh
+```
+
+#### 4. Install Noir CLI
+
+```bash
+./scripts/install-noir.sh
+```
+
+#### 5. Install Barretenberg (bb)
+
+```bash
+./scripts/install-barretenberg.sh
+```
+
+#### 6. Install Garaga (Python CLI)
+
+```bash
+python3.10 -m pip install --user garaga==0.15.5
+```
+
+---
+
+## Step 2: Compile the Noir Circuit
+
+Navigate to the `zk-badges/donation_badge` directory and compile the Noir circuit:
 
 ```bash
 cd zk-badges/donation_badge
-
-# Compile the circuit
 nargo compile
-
-# Run tests
 nargo test
-
-# Expected output:
-# [donation_badge] Compiling...
-# [donation_badge] Testing...
-# test test_valid_silver_badge ... ok
-# test test_valid_gold_badge ... ok
 ```
 
-## Step 6: Generate Proof and Verification Key
+Expected output:
+
+```
+[donation_badge] Compiling...
+[donation_badge] Testing...
+test test_valid_silver_badge ... ok
+test test_valid_gold_badge ... ok
+```
+
+---
+
+## Step 3: Generate Proof and Verification Key
 
 ```bash
 # Execute circuit with inputs to generate witness
@@ -114,9 +130,41 @@ bb verify_ultra_keccak_honk \
     -p ./target/proof.bin
 
 # Expected: Proof verified successfully
+
+> Regenerate calldata via Garaga (optional):
+> 
+> ```bash
+> garaga calldata \
+>   --system ultra_keccak_honk \
+>   --vk zk-badges/donation_badge/target/vk.bin \
+>   --proof zk-badges/donation_badge/target/proof.bin \
+>   --format array > calldata.txt
+> ```
+> This writes `calldata.txt` (ignored by git) at repo root and can be reproduced anytime.
 ```
 
-## Step 7: Generate Cairo Verifier Contract
+---
+
+## Step 4: Install Starknet Foundry (for contract deployment)
+
+```bash
+# Install snfoundryup
+curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
+
+# Reload shell
+source ~/.bashrc
+
+# Install Starknet Foundry
+snfoundryup
+
+# Verify
+snforge --version
+sncast --version
+```
+
+---
+
+## Step 5: Generate Cairo Verifier Contract
 
 ```bash
 # Activate Python environment
@@ -130,9 +178,21 @@ garaga gen \
     --project-name donation_badge_verifier
 
 # This creates a new Scarb project in ./donation_badge_verifier/
+
+> Note: You can also generate calldata through the API as a reproducible alternative:
+> 
+> ```bash
+> bun run api &
+> curl -s -H 'Content-Type: application/json' \
+>   -d '{"donationamount":"15000","threshold":"10000","donorsecret":"12345","badgetier":"2"}' \
+>   http://localhost:3001/api/generate-proof
+> ```
+> The endpoint orchestrates witness → proof → vk → calldata and returns the `calldata` and `commitment`.
 ```
 
-## Step 8: Integrate Badge Contract
+---
+
+## Step 6: Integrate Badge Contract
 
 After Garaga generates the verifier:
 
@@ -149,7 +209,9 @@ scarb build
 # Output: Compiled donation_badge_verifier.contract_class.json
 ```
 
-## Step 9: Deploy to Starknet
+---
+
+## Step 7: Deploy to Starknet
 
 ### Configure Deployment Account
 
@@ -177,7 +239,9 @@ sncast --profile sepolia deploy \
 # Note the contract address
 ```
 
-## Step 10: Update Badge Service
+---
+
+## Step 8: Update Badge Service
 
 Update `src/badge-service.ts` with the deployed contract address:
 
@@ -188,7 +252,9 @@ const BADGE_CONTRACT_ADDRESS = {
 };
 ```
 
-## Step 11: Install Browser Dependencies (Optional)
+---
+
+## Step 9: Install Browser Dependencies (Optional)
 
 For browser-based proof generation, install:
 
@@ -202,6 +268,8 @@ Then copy the compiled circuit to `public/circuits/`:
 cp zk-badges/donation_badge/target/donation_badge.json public/circuits/
 ```
 
+---
+
 ## Testing End-to-End
 
 1. Start the app: `bun run dev:web`
@@ -211,60 +279,37 @@ cp zk-badges/donation_badge/target/donation_badge.json public/circuits/
 5. Generate proof (may take 30-60 seconds)
 6. Claim badge on-chain
 
-## Project Structure
+---
 
-```
-tongo-donation-demo/
-├── src/
-│   ├── index.html          # Updated with badge UI
-│   ├── badge-service.ts    # Badge claiming logic
-│   └── ...
-├── zk-badges/
-│   └── donation_badge/
-│       ├── src/
-│       │   └── main.nr     # Noir circuit
-│       ├── Nargo.toml
-│       └── target/
-│           ├── donation_badge.json  # Compiled circuit
-│           ├── vk.bin               # Verification key
-│           └── proof.bin             # Sample proof
-├── donation_badge_verifier/        # Generated by Garaga
-│   ├── src/
-│   │   ├── lib.cairo              # Auto-generated verifier
-│   │   └── badge_contract.cairo   # Badge minting logic
-│   └── Scarb.toml
-└── public/
-    └── circuits/
-        └── donation_badge.json    # Served for browser proving
-```
+## Troubleshooting (Preventive Steps)
 
-## Troubleshooting
+- Inputs must meet tier thresholds to prevent Noir assertion failures:
+    - Bronze: `donationamount ≥ 1000`
+    - Silver: `donationamount ≥ 10000`
+    - Gold: `donationamount ≥ 100000`
+    - Ensure `badgetier` matches the intended threshold, and `threshold` aligns with the circuit’s checks.
 
-### Noir compilation errors
-- Ensure you're using Noir 1.0.0-beta.5 or compatible
-- Check that all dependencies are installed
+- Ensure tools are on the pinned versions shown at the top. Re-run installers if mismatched:
+    ```bash
+    make install-all
+    ```
 
-### Garaga errors
-- Ensure Python 3.10+ is used
-- Check that verification key was generated correctly
-- Verify the system flag matches your proof system
+- Garaga binary resolution:
+    - Prefer PATH install: `~/.local/bin/garaga` (added by `pip --user`).
+    - If using a venv, activate before running commands:
+        ```bash
+        source garaga-env/bin/activate
+        ```
 
-### Contract deployment errors
-- Ensure you have sufficient STRK for gas
-- Check network configuration in `snfoundry.toml`
-- Verify contract compiled successfully
+- Repo-relative paths only:
+    - Run commands from the repository root unless stated otherwise.
+    - Avoid absolute paths that reference external workspaces.
 
-### Browser proof generation
-- Ensure circuit JSON is accessible at `/circuits/donation_badge.json`
-- Check browser console for WASM loading errors
-- Consider using a backend service for proof generation in production
-
-## Next Steps
-
-- [ ] Deploy to testnet (Sepolia)
-- [ ] Test badge claiming flow
-- [ ] Deploy to mainnet
-- [ ] Update contract addresses in badge-service.ts
-- [ ] Add badge display to user profiles
-- [ ] Implement badge verification API
+- If API returns 500 due to circuit assertions, validate the payload:
+    ```bash
+    curl -s -H 'Content-Type: application/json' \
+        -d '{"donationamount":"15000","threshold":"10000","donorsecret":"12345","badgetier":"2"}' \
+        http://localhost:3001/api/generate-proof
+    ```
+    This Silver-tier example should succeed.
 
