@@ -1,5 +1,7 @@
 # Starknet Privacy Toolkit (Tongo + Verified Donor Badges)
 
+[![CI](https://github.com/cxto21/starknet-privacy-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/cxto21/starknet-privacy-toolkit/actions/workflows/ci.yml)
+
 This repository hosts an end-to-end reference implementation of Starknet privacy tooling. It combines two reference demos that share the same UI and contracts:
 1. A “Verified Donor Badge” flow that uses Noir circuits, Barretenberg proofs, Garaga-generated Cairo verifiers, and a Starknet badge contract to prove a donor met a threshold without revealing the amount.
 2. The Tongo private donation experience, showing how to fund, send, rollover, and withdraw encrypted balances on Starknet Mainnet (USDC) and Sepolia (STRK).
@@ -16,7 +18,7 @@ This repository hosts an end-to-end reference implementation of Starknet privacy
 | ZK Circuit | `zk-badges/donation_badge` | Noir circuit that hashes `(donation_amount, donor_secret)` with Poseidon and enforces `donation_amount >= threshold`. |
 | Proving | Barretenberg `0.67.0` | Generates Ultra Keccak Honk proofs + VK compatible with Garaga 0.15.5. |
 | Verifier | `donation_badge_verifier` | Garaga-generated verifier plus custom `DonationBadge` contract that mints tiered badges after proof validation. |
-| Backend | `api/generate-proof.ts` | Bun API that orchestrates witness creation, proving, and calldata generation. |
+| Backend | `api/server.ts` | Bun API that orchestrates witness creation, proving, and calldata generation. |
 | Frontend | `src/web/index.html` + `src/badge-service.ts` | Unified UI: funding/withdrawals follow the selected Starknet network, while the badge experience is currently hard-pinned to Sepolia. |
 
 > **Important:** The badge verifier is deployed only on **Starknet Sepolia** today. The UI always connects to Sepolia for badge proofs/claims even when the network toggle is on Mainnet for Tongo operations.
@@ -83,11 +85,14 @@ deployments/
   └── sepolia.json             # Contract registry consumed by frontend
 
 src/
-  ├── index.html               # Demo UI with badge section
+  ├── web/index.html           # Demo UI with badge section
   ├── badge-service.ts         # Client helper for proofs + badge contract
   └── deployments.ts           # Loader for deployment JSON files
 
-api/generate-proof.ts          # Bun API endpoint to invoke Noir/bb/Garaga
+Makefile                     # Simplifies ZK Chain Installation
+scripts/                    # Scripts for dependencies and Setup
+
+api/server.ts                  # Bun API endpoint to invoke Noir/bb/Garaga
 BADGE_IMPLEMENTATION.md        # Requirements + architecture notes
 BADGE_SETUP.md                 # Environment + troubleshooting log
 DEPLOY.md                      # Pages deploy + deployment registry policy
@@ -103,30 +108,39 @@ DEPLOY.md                      # Pages deploy + deployment registry policy
 
 ## Getting Started
 
-1. **Clone + install JS deps**
+[![CI](https://github.com/cxto21/starknet-privacy-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/cxto21/starknet-privacy-toolkit/actions/workflows/ci.yml)
+
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/omarespejel/tongo-ukraine-donations.git
-   cd tongo-donation-demo
-   bun install
+  git clone https://github.com/cxto21/starknet-privacy-toolkit.git
+  cd starknet-privacy-toolkit
    ```
 
-2. **Install ZK toolchain (versions matter!)**
+2. **Run the setup script**
    ```bash
-   # Noir & Barretenberg
-   curl -L noirup.dev | bash
-   noirup --version 1.0.0-beta.1
-   curl -L bbup.dev | bash
-   bbup --version 0.67.0
-
-   # Garaga + Cairo tooling (python3.10 + pip)
-   pip install garaga==0.15.5
-   brew install scarb@2.9.2  # or download release tarball
+   ./scripts/setup.sh
    ```
+   This script installs all required dependencies, including:
+   - System dependencies (e.g., `libc++1`)
+   - Rust and Cargo
+   - Scarb
+   - Noir CLI
+   - Barretenberg (bb)
+   - Garaga (Python CLI)
 
-3. **Configure Starknet credentials**
-   - `donation_badge_verifier/.secrets` contains **demo-only** RPC + account values. Do **not** push real keys—use `.secrets.example` as a template and keep your local `.secrets` added to `.gitignore`.
-   - For badge declares/claims use Sepolia accounts (see `donation_badge_verifier/snfoundry.toml`). For Tongo operations you can connect mainnet wallets directly in the UI.
-   - For Starkli-based flows, create a keystore and account config (see instructions in `BADGE_SETUP.md`).
+3. **Verify the installation**
+   ```bash
+   make install-all
+   ```
+   This command ensures all tools are installed and ready to use.
+
+4. **Run CI locally (optional)**
+  ```bash
+  ./scripts/verify.sh
+  scarb --version && (cd donation_badge_verifier && scarb build)
+  bun install && (bun run api & sleep 3 && curl -s -H 'Content-Type: application/json' -d '{"donationamount":"15000","threshold":"10000","donorsecret":"12345","badgetier":"2"}' http://localhost:3001/api/generate-proof)
+  ```
+
 
 ---
 
@@ -221,7 +235,7 @@ After the transaction is accepted, `sncast call --function get_badge_tier` shoul
 
 ## Frontend + API
 
-### API (`api/generate-proof.ts`)
+### API (`api/server.ts`)
 Runs under Bun; it shells out to Noir/bb/Garaga and streams the calldata back to the client. Ensure the host machine has the toolchain installed and reachable in `$PATH`.
 
 ```bash
