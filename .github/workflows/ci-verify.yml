@@ -1,0 +1,42 @@
+name: CI Verify
+
+on:
+  push:
+    branches: [ main, chore/**, feat/**, fix/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y curl git unzip jq python3 python3-venv build-essential pkg-config libssl-dev
+
+      - name: Run verification script
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/verify.sh
+
+      - name: Quick toolchain install (summary)
+        run: |
+          make install-all || true
+
+      - name: Print versions
+        run: |
+          command -v sncast >/dev/null 2>&1 && sncast --version || echo "sncast not installed"
+          command -v nargo >/dev/null 2>&1 && nargo --version || echo "nargo not installed"
+          command -v scarb >/dev/null 2>&1 && scarb --version || echo "scarb not installed"
+          command -v bb >/dev/null 2>&1 && bb --version || echo "bb not installed"
+          command -v bun >/dev/null 2>&1 && bun --version || echo "bun not installed"
