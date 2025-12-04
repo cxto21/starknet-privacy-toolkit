@@ -28,10 +28,8 @@ jobs:
         run: |
           chmod +x scripts/*.sh
           ./scripts/verify.sh
-
-      - name: Quick toolchain install (summary)
-        run: |
-          make install-all || true
+      # Note: avoid running make install-all here to prevent CI noise
+      # If needed, this can be re-enabled with continue-on-error.
 
       - name: Print versions
         run: |
