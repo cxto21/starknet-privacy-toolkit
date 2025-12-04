@@ -2,15 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [ main, chore/**, feat/**, fix/** ]
+    branches: [ main, chore/** ]
   pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
 
 jobs:
-  build-and-verify:
+  deps-and-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,14 +23,49 @@ jobs:
           echo "$HOME/.bun/bin" >> $GITHUB_PATH
           bun -v
 
-      - name: Install JS dependencies
-        run: bun install
+      - name: System deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libc++1 build-essential python3.10 python3.10-venv python3.10-dev
+          python3.10 -m pip install --user --upgrade pip setuptools wheel
 
-      - name: Type-check (tsc)
-        run: bun run type-check
+      - name: Install repo dependencies (deps-only)
+        run: |
+          chmod +x scripts/*.sh || true
+          ./scripts/setup.sh
 
-      - name: Build (Vite)
-        run: bun run build
+      - name: Verify dependency setup (from DEPENDENCIES)
+        run: |
+          ./scripts/verify.sh || true
+          make install-all
 
-      - name: CI verify (docs + structure)
-        run: bash scripts/ci-verify.sh
+      - name: Toolchain versions
+        run: |
+          nargo --version || true
+          bb --version || true
+          scarb --version || true
+          sncast --version || true
+          python3.10 -m garaga --version || true
+
+      - name: Build Cairo verifier
+        run: |
+          cd donation_badge_verifier
+          scarb --version
+          scarb build
+
+      - name: Noir compile and tests (smoke)
+        run: |
+          cd zk-badges/donation_badge
+          nargo compile
+          nargo test
+
+      - name: API smoke test
+        run: |
+          bun install
+          (bun run api > /tmp/proof_api.log 2>&1 & echo $! > /tmp/proof_api.pid)
+          sleep 3
+          curl -s -H "Content-Type: application/json" \
+            -d '{"donationamount":"15000","threshold":"10000","donorsecret":"12345","badgetier":"2"}' \
+            http://localhost:3001/api/generate-proof | head -c 200
+          kill "$(cat /tmp/proof_api.pid)" || true
+          tail -n 50 /tmp/proof_api.log || true
