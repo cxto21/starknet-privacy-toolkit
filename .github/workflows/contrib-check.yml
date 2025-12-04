@@ -1,0 +1,33 @@
+name: Contrib Checks
+
+on:
+  push:
+    paths:
+      - 'contrib/**'
+      - '.github/workflows/contrib-check.yml'
+  pull_request:
+    paths:
+      - 'contrib/**'
+      - '.github/workflows/contrib-check.yml'
+
+jobs:
+  validate-contrib:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate contrib folder structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f contrib/README.md
+          test -f contrib/new-record.sh
+          chmod +x contrib/new-record.sh
+          # Validate filenames follow NNNN-*.md (excluding README and helper)
+          bad=$(ls -1 contrib | awk '/^[0-9]{4}-.*\.md$/ {next} /README\.md|new-record\.sh/ {next} {print}' || true)
+          if [ -n "$bad" ]; then
+            echo "Invalid contrib filenames:"; echo "$bad"; exit 1; fi
+          # Ensure 0001 record has key sections
+          grep -qE '^Status:' contrib/0001-oz-kit-flow-alignment.md
+          grep -qE '^## (Context|Decision|Implementation)' contrib/0001-oz-kit-flow-alignment.md

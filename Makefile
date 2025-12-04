@@ -1,27 +1,44 @@
-# Simple Makefile to wrap deps-only installers
+# Unified Makefile with expected Oz Kit targets
 
-.PHONY: install-all install-noir install-scarb install-bb install-sncast verify uninstall
+.PHONY: install-all install-noir install-scarb install-barretenberg install-sncast \
+	setup verify uninstall account-create account-deploy account-balance account-topup
 
-install-all: install-noir install-scarb install-bb install-sncast
-	@echo "All toolchain installers executed."
+# Installer targets (expected by scripts/verify.sh)
+install-sncast:
+	-./scripts/install-sncast.sh
 
 install-noir:
-	@./scripts/install-noir.sh || (echo "install-noir failed" && exit 1)
+	-./scripts/install-noir.sh
 
 install-scarb:
-	@./scripts/install-scarb.sh || (echo "install-scarb failed" && exit 1)
+	-./scripts/install-scarb.sh
 
-install-bb:
-	@./scripts/install-barretenberg.sh || (echo "install-barretenberg failed" && exit 1)
+install-barretenberg:
+	-./scripts/install-barretenberg.sh
 
-install-sncast:
-	@./scripts/install-sncast.sh || (echo "install-sncast failed" && exit 1)
+install-all: install-sncast install-noir install-scarb install-barretenberg
+	@echo ""
+	@echo "================================"
+	@echo "Installation Summary"
+	@echo "================================"
+	@echo ""
+	@command -v sncast >/dev/null 2>&1 && echo "✓ sncast: $$(sncast --version 2>&1 | head -1)" || echo "✗ sncast: Not installed (manual setup required)"
+	@command -v nargo >/dev/null 2>&1 && echo "✓ nargo: $$(nargo --version 2>&1 | head -1)" || echo "✗ nargo: Not installed"
+	@command -v scarb >/dev/null 2>&1 && echo "✓ scarb: $$(scarb --version 2>&1 | head -1)" || echo "✗ scarb: Not installed"
+	@command -v bb >/dev/null 2>&1 && echo "✓ bb: $$(bb --version 2>&1)" || echo "✗ bb: Not installed"
+	@command -v npm >/dev/null 2>&1 && echo "✓ npm: $$(npm --version)" || echo "✗ npm: Not installed"
+	@echo ""
+
+setup:
+	./scripts/setup.sh
 
 verify:
 	@./scripts/verify.sh
 
 uninstall:
 	@./scripts/uninstall.sh
+
+# Account management (expected by scripts/verify.sh)
 URL=https://ztarknet-madara.d.karnot.xyz
 ACCOUNT_NAME=ztarknet
 ACCOUNT_CLASS_HASH=0x01484c93b9d6cf61614d698ed069b3c6992c32549194fc3465258c2194734189
@@ -54,34 +71,3 @@ account-balance:
 	sncast balance \
 		--token-address $(FEE_TOKEN_ADDRESS) \
 		--url $(URL)
-
-## Install dependencies (Automated)
-
-install-sncast:
-	-./scripts/install-sncast.sh
-
-install-noir:
-	-./scripts/install-noir.sh
-
-install-scarb:
-	-./scripts/install-scarb.sh
-
-install-barretenberg:
-	-./scripts/install-barretenberg.sh
-
-install-all: install-sncast install-noir install-scarb install-barretenberg
-	@echo ""
-	@echo "================================"
-	@echo "Installation Summary"
-	@echo "================================"
-	@echo ""
-	@command -v sncast >/dev/null 2>&1 && echo "✓ sncast: $$(sncast --version 2>&1 | head -1)" || echo "✗ sncast: Not installed (manual setup required)"
-	@command -v nargo >/dev/null 2>&1 && echo "✓ nargo: $$(nargo --version 2>&1 | head -1)" || echo "✗ nargo: Not installed"
-	@command -v scarb >/dev/null 2>&1 && echo "✓ scarb: $$(scarb --version 2>&1 | head -1)" || echo "✗ scarb: Not installed"
-	@command -v bb >/dev/null 2>&1 && echo "✓ bb: $$(bb --version 2>&1)" || echo "✗ bb: Not installed"
-	@command -v npm >/dev/null 2>&1 && echo "✓ npm: $$(npm --version)" || echo "✗ npm: Not installed"
-	@echo ""
-
-
-setup:
-	./scripts/setup.sh
