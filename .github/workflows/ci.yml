@@ -26,7 +26,8 @@ jobs:
       - name: Install repo dependencies (deps-only)
         run: |
           chmod +x scripts/*.sh || true
-          ./scripts/setup.sh
+          export CI=1 NONINTERACTIVE=1 DEBIAN_FRONTEND=noninteractive
+          yes "" | ./scripts/setup.sh || ./scripts/setup.sh
 
       - name: Verify dependency setup (from DEPENDENCIES)
         run: |
